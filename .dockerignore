@@ -1,0 +1,9 @@
+node_modules
+.git
+.DS_Store
+dist
+build
+*.log
+.env
+.env.local
+docker-compose.override.yml

@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: XLR8_WEB
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/backend/src:/app/apps/backend/src
+      - ./apps/frontend/src:/app/apps/frontend/src
+    working_dir: /app/apps/backend  # Set working directory to backend
+    command: pnpm run dev  # Run backend dev serve

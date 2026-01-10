@@ -1,0 +1,18 @@
+{
+    "name": "XLR8",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "dev": "docker-compose up",
+        "dev:build": "docker-compose up --build",
+        "down": "docker-compose down",
+        "logs": "docker-compose logs -f",
+        "stop": "docker-compose stop",
+        "start": "docker-compose start"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "packageManager": "pnpm@10.28.0"
+}
