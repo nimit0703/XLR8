@@ -1,6 +1,41 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: XLR8_DB
+    environment:
+      POSTGRES_USER: xlr8user
+      POSTGRES_PASSWORD: xlr8pass
+      POSTGRES_DB: xlr8db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xlr8user -d xlr8db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Database migrations
+  db-migrate:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: XLR8_DB_MIGRATE
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://xlr8user:xlr8pass@postgres:5432/xlr8db
+    command: >
+      sh -c "cd /app/apps/db &&
+             npx prisma migrate deploy"
+    restart: "no"
+
+  # Backend Service
   backend:
     build:
       context: .
@@ -10,6 +45,30 @@ services:
       - "3001:3001"
     volumes:
       - ./apps/backend/src:/app/apps/backend/src
-      - ./apps/frontend/src:/app/apps/frontend/src
-    working_dir: /app/apps/backend  # Set working directory to backend
-    command: pnpm run dev  # Run backend dev serve
+      - ./apps/db:/app/apps/db
+      - /app/node_modules
+    environment:
+      DATABASE_URL: postgresql://xlr8user:xlr8pass@postgres:5432/xlr8db
+      NODE_ENV: development
+    working_dir: /app/apps/backend
+    command: pnpm run dev
+    depends_on:
+      - db-migrate
+
+  # Database GUI (PgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: XLR8_PGADMIN
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@xlr8.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
+  pgadmin_data:

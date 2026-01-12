@@ -1,25 +1,36 @@
 FROM node:20-alpine
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm globally
+RUN npm install -g pnpm@10.28.0
 
 WORKDIR /app
 
-# Copy project
-COPY apps/backend ./apps/backend
-COPY apps/frontend ./apps/frontend
+# Copy workspace configuration files
+COPY pnpm-workspace.yaml package.json ./
 
-# Install and build frontend
-WORKDIR /app/apps/frontend
-RUN pnpm install
-RUN pnpm run build
+# Copy all package.json files to leverage Docker cache
+COPY apps/db/package.json apps/db/
+COPY apps/backend/package.json apps/backend/
+COPY apps/frontend/package.json apps/frontend/
 
-# Install backend
-WORKDIR /app/apps/backend
+# Install all workspace dependencies
 RUN pnpm install
 
+# Copy the actual source code
+COPY apps/db apps/db
+COPY apps/backend apps/backend  
+COPY apps/frontend apps/frontend
+
+# Generate Prisma Client
+RUN cd apps/db && pnpm run generate
+
+
+# Build frontend
+RUN cd apps/frontend && pnpm run build
+
+# Expose backend port
 EXPOSE 3001
 
-# IMPORTANT: Run the backend server, NOT docker-compose
+# Set working directory and start
 WORKDIR /app/apps/backend
 CMD ["pnpm", "run", "dev"]
