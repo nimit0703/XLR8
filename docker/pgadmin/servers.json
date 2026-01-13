@@ -1,0 +1,14 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "XLR8 Database",
+            "Group": "Servers",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "xlr8db",
+            "Username": "xlr8user",
+            "SSLMode": "prefer",
+            "PassFile": "/pgpass"
+        }
+    }
+}
