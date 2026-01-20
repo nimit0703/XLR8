@@ -7,6 +7,7 @@
         "dev": "docker compose up",
         "dev:build": "docker compose up --build",
         "dev:db": "docker compose up postgres pgadmin",
+        "dev:backend": "pnpm --filter backend run dev",
         "dev:db:detached": "docker compose up -d postgres pgadmin",
         "down": "docker compose down",
         "logs": "docker compose logs -f",

@@ -1,215 +1,55 @@
-import 'dotenv/config';
-import express, { Request, Response } from 'express';
-import path from 'path';
-import { prisma } from 'db';
+import 'dotenv/config'
+import express from 'express'
+import path from 'path'
+import { connectDB, prisma } from './config/db'
+import { logger } from './utils/logger'
+import { httpLogger } from './middleware/httpLogger'
+import cookieParser from 'cookie-parser'
+import { verifyJWT } from './middleware/auth.middleware'
+// Import Routes
+import userRoutes from './features/users/user.routes'
+import healthRoutes from './features/health/health.routes'
+import authRoutes from './features/auth/auth.routes'
+const app = express()
+const PORT = process.env.PORT || 3001
 
-const app = express();
-const PORT = 3001;
+// 1. Database Connection
+connectDB()
 
-// Middleware
-app.use(express.json());
+// 2. Middleware
+app.use(express.json())
+app.use(cookieParser())
+app.use(httpLogger)
 
-// Get absolute paths
-const __dirname = path.resolve();
-const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
-console.log(`📁 Frontend path: ${frontendPath}`);
+// 3. API Routes
+app.use('/api/health', healthRoutes)
+app.use('/api/auth', authRoutes)
+app.use(verifyJWT)
+app.use('/api/users', userRoutes)
 
-// Serve static files from frontend dist
-app.use(express.static(frontendPath));
+// 4. Frontend Static Files (Production/Dist)
+const __dirname = path.resolve()
+const frontendPath = path.join(__dirname, '..', 'frontend', 'dist')
+app.use(express.static(frontendPath))
 
-// ========== DATABASE CONNECTION TEST ==========
-async function testDatabaseConnection() {
-  try {
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    process.exit(1);
-  }
+// 5. Catch-All for Frontend
+app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'))
+})
+
+// 6. Start Server
+const server = app.listen(PORT, () => {
+    if(process.env.NODE_ENV === 'production'){
+        logger.info(`🚀 Server running on http://localhost:${PORT}`)
+    }
+})
+
+// Graceful Shutdown
+const shutdown = async () => {
+    logger.warn('🛑 Shutting down...')
+    await prisma.$disconnect()
+    server.close(() => process.exit(0))
 }
 
-// ========== API ROUTES ==========
-// Health check with DB status
-app.get('/api/health', async (req: Request, res: Response) => {
-  try {
-    // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
-    
-    res.json({
-      success: true,
-      message: 'Backend is working! 🎉',
-      database: 'connected',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Backend is running but database is unavailable',
-      database: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Get all users from database
-app.get('/api/users', async (req: Request, res: Response) => {
-  try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      }
-    });
-
-    res.json({
-      success: true,
-      data: users,
-      count: users.length
-    });
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch users',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Create a new user
-app.post('/api/users', async (req: Request, res: Response) => {
-  try {
-    const { email, username, password } = req.body;
-
-    // Basic validation
-    if (!email || !username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields: email, username, password'
-      });
-    }
-
-    const user = await prisma.user.create({
-      data: {
-        email,
-        username,
-        password, // In production, hash this password!
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        role: true,
-        createdAt: true,
-      }
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'User created successfully',
-      data: user
-    });
-  } catch (error) {
-    console.error('Error creating user:', error);
-    
-    // Handle unique constraint violations
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
-      return res.status(409).json({
-        success: false,
-        error: 'User with this email or username already exists'
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create user',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Get a single user by ID
-app.get('/api/users/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: user
-    });
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch user'
-    });
-  }
-});
-
-// 404 handler for API routes
-app.all('/api/*', (req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: `API route not found: ${req.originalUrl}`
-  });
-});
-
-// ========== FRONTEND CATCH-ALL ==========
-app.get('*', (req: Request, res: Response) => {
-  console.log(`📱 Serving frontend for: ${req.path}`);
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
-
-// ========== START SERVER ==========
-async function startServer() {
-  await testDatabaseConnection();
-  
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`✅ API available at http://localhost:${PORT}/api/health`);
-    console.log(`🌐 Frontend available at http://localhost:${PORT}`);
-  });
-}
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-startServer().catch((error) => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
-});
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)
