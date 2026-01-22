@@ -46,13 +46,18 @@ services:
       - "3001:3001"
     volumes:
       - ./apps/backend/src:/app/apps/backend/src
+      # 1. Mount the source code for the DB package
       - ./apps/db:/app/apps/db
+      # 2. Preserve the ROOT node_modules (you already had this)
       - /app/node_modules
+      # 3. ADD THIS: Preserve the DB package's node_modules
+      - /app/apps/db/node_modules
     environment:
       DATABASE_URL: postgresql://xlr8user:xlr8pass@postgres:5432/xlr8db
       NODE_ENV: development
     working_dir: /app/apps/backend
-    command: pnpm run dev
+    command: >
+      sh -c "cd ../db && pnpm run generate && cd ../backend && pnpm run dev"
     depends_on:
       - db-migrate
 

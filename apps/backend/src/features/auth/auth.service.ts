@@ -92,7 +92,7 @@ export const authService = {
 // Helper: Generate Tokens
 function generateTokens(userId: string, role: string) {
     const accessToken = jwt.sign({ id: userId, role }, ACCESS_SECRET, {
-        expiresIn: '15m',
+        expiresIn: '5m',
     })
     const refreshToken = jwt.sign({ id: userId }, REFRESH_SECRET, {
         expiresIn: '7d',
