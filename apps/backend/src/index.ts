@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { prisma } from 'db';
+import { authRoutes } from './auth/routes/auth.routes';
 
 const app = express();
 const PORT = 3001;
@@ -29,6 +30,7 @@ async function testDatabaseConnection() {
 }
 
 // ========== API ROUTES ==========
+
 // Health check with DB status
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
@@ -52,7 +54,10 @@ app.get('/api/health', async (req: Request, res: Response) => {
   }
 });
 
-// Get all users from database
+// Auth routes
+app.use('/api/auth', authRoutes);
+
+// Get all users from database (protected example)
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
@@ -98,7 +103,7 @@ app.post('/api/users', async (req: Request, res: Response) => {
       data: {
         email,
         username,
-        password, // In production, hash this password!
+        password, // Note: In production, use bcrypt from auth controller
       },
       select: {
         id: true,
@@ -133,44 +138,6 @@ app.post('/api/users', async (req: Request, res: Response) => {
   }
 });
 
-// Get a single user by ID
-app.get('/api/users/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: user
-    });
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch user'
-    });
-  }
-});
-
 // 404 handler for API routes
 app.all('/api/*', (req: Request, res: Response) => {
   res.status(404).json({
@@ -192,6 +159,7 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`✅ API available at http://localhost:${PORT}/api/health`);
+    console.log(`🔐 Auth API available at http://localhost:${PORT}/api/auth`);
     console.log(`🌐 Frontend available at http://localhost:${PORT}`);
   });
 }
